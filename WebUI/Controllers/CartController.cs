@@ -12,9 +12,11 @@ namespace WebUI.Controllers
     public class CartController : Controller
     {
         private IProductRepository repository;
-        public CartController(IProductRepository repository)
+        private IOrderProcessor orderProcessor;
+        public CartController(IProductRepository repository, IOrderProcessor proc)
         {
             this.repository = repository;
+            this.orderProcessor = proc;
         }
         public ViewResult Index(Cart cart, string returnUrl)
         {
@@ -24,6 +26,24 @@ namespace WebUI.Controllers
                 ReturnUrl = returnUrl
             });
         }
+        [HttpPost]
+        public ViewResult Checkout(Cart cart, ShippingDetails details)
+        {
+            if (cart.Lines.Count() == 0)
+            {
+                ModelState.AddModelError("", "Sorry, your cart is empty");
+            }
+            if (ModelState.IsValid)
+            {
+                orderProcessor.ProcessOrder(cart, details);
+                cart.Clear();
+                return View("Completed");
+            } else
+            {
+                return View(details);
+            }
+        }
+
         public RedirectToRouteResult AddToCart(Cart cart, int productId, string returnUrl)
         {
             Product product = repository.Products.Where(p => p.ProductID == productId).FirstOrDefault();
@@ -42,6 +62,14 @@ namespace WebUI.Controllers
                 cart.RemoveLine(product);
             }
             return RedirectToAction("Index", new { returnUrl });
+        }
+        public PartialViewResult Summary(Cart cart)
+        {
+            return PartialView(cart);
+        }
+        public ViewResult Checkout()
+        {
+            return View(new ShippingDetails());
         }
     }
 }
